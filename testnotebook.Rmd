@@ -1,0 +1,130 @@
+---
+title: "Early Childhood Development"
+output: html_notebook
+---
+```{r}
+install.packages("rJava",type='source')
+install.packages("XLConnect")
+```
+
+In order to get java working properly on R you need to explicitly load it from the location. You can get this using
+R CMD javareconf and using the location indicated in Java home path and the appending "/lib/server/libjvm.dylib" to it...
+
+```{r}
+options(java.parameters = "- Xmx1024m")
+dyn.load("/Library/Java/JavaVirtualMachines/jdk1.8.0_121.jdk/Contents/Home/jre/lib/server/libjvm.dylib") #nightmare to get java working on osx properly :( )
+library("rJava")
+```
+
+```{r}
+usePackage <- function(p) 
+{
+  if (!is.element(p, installed.packages()[,1]))
+    install.packages(p, dep = TRUE)
+  require(p, character.only = TRUE)
+}
+usePackage("RMySQL")
+usePackage("XLConnect")
+```
+
+```{r}
+setwd("~/pCloud Sync/work/2017/EarlyChildhoodDevelopment")
+dfFacilities <- readWorksheetFromFile("ECD Research Pilot Sampling Frame.xlsx", 
+                            sheet=3, 
+                            startRow = 1,
+                            endCol = 6)
+
+```
+
+```{r}
+dfMomConnect <- readWorksheetFromFile("ECD Research Pilot Sampling Frame.xlsx", 
+                            sheet=4, 
+                            startRow = 1,
+                            endCol = 5)
+```
+
+```{r}
+head(dfFacilities)
+head(dfMomConnect)
+```
+```{r}
+unique(dfFacilities[,'province'])
+```
+
+```{r}
+con <- dbConnect(MySQL(), user="root", 
+    dbname="charles", host="localhost",client.flag=CLIENT_MULTI_STATEMENTS)
+dbListTables(con)
+dbWriteTable(con,"facilities",dfFacilities,overwrite=T)
+dbDisconnect(con)
+```
+```{r}
+con <- dbConnect(MySQL(), user="root", 
+    dbname="charles", host="localhost",client.flag=CLIENT_MULTI_STATEMENTS)
+dbListTables(con)
+dbWriteTable(con,"momconnect",dfMomConnect,overwrite=T)
+dbDisconnect(con)
+```
+
+yourtable <- dbReadTable(con,"sometable")
+```{r}
+con <- dbConnect(MySQL(), user="root", 
+    dbname="charles", host="localhost",client.flag=CLIENT_MULTI_STATEMENTS)
+dbListTables(con)
+a <- dbReadTable(con,"idavailable")
+# watch out with the overwrite argument it does what it says :)
+dbDisconnect(con)
+```
+
+```{r}
+head(a,10)
+```
+```{r}
+con <- dbConnect(MySQL(), user="root", 
+    dbname="charles", host="localhost",client.flag=CLIENT_MULTI_STATEMENTS)
+dbListTables(con)
+a <- dbReadTable(con,"south_africa_clinical_facilities")
+# watch out with the overwrite argument it does what it says :)
+dbDisconnect(con)
+```
+```{r}
+colnames(a)
+```
+
+```{r}
+a$lat<-sapply(a$gps_coords, function(x) as.numeric(unlist(strsplit(as.character(x),','))[1]))
+a$lon<-sapply(a$gps_coords, function(x) as.numeric(unlist(strsplit(as.character(x),','))[2]))
+```
+
+```{r}
+a[grep("Stellenbosch",a$municipality,value=FALSE),]
+```
+
+```{r}
+library("leaflet")
+
+
+# Show first 20 rows from the `quakes` dataset
+leaflet(data = a[grep("Western Cape",a$physical_address,value=FALSE),]) %>% addTiles() %>%
+  addMarkers(~lon, ~lat, popup = ~as.character(a$physical_address))
+```
+
+
+```{r}
+data(quakes)
+library("leaflet")
+quakes
+
+# Show first 20 rows from the `quakes` dataset
+leaflet(data = quakes[1:20,]) %>% addTiles() %>%
+  addMarkers(~long, ~lat, popup = ~as.character(mag), label = ~as.character(mag))
+```
+
+```{r}
+usePackage("ggplot2")
+library("geosphere")
+```
+
+```{r}
+distm (c(-33.9249, 18.4241), c(-26.2041, 28.0473), fun = distHaversine)/1000
+```

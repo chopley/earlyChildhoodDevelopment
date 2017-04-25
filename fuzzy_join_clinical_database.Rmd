@@ -1,0 +1,96 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+
+```{r}
+dbDisconnect(con)
+
+```
+
+```{r}
+random_allocation <- read.csv('random_220_per_language_25042017.csv')
+con <- dbConnect(MySQL(), user="root", 
+                 dbname="charles", host="localhost",client.flag=CLIENT_MULTI_STATEMENTS)
+dbListTables(con)
+unique_sa_clinical_facilities <- dbReadTable(con,"unique_sa_clinical_facilities")
+dbDisconnect(con)
+head(random_allocation)
+head(unique_sa_clinical_facilities,20)
+nrow(unique_sa_clinical_facilities)
+```
+
+```{r}
+#massage the data a little so that we can parse it using google
+df <- read.csv('random_220_per_language_25042017.csv')
+
+df$test <- gsub("ec", "Eastern Cape", df$facility)
+df$test <- gsub("kz", "Kwazulu-Natal", df$test)
+df$test <- gsub("nw", "North West", df$test)
+df$test <- gsub("wc", "Western Cape", df$test)
+df$test <- gsub("nc", "Northern Cape", df$test)
+
+df$test <- gsub("Clinic", "", df$test)
+df$test <- gsub("CHC", "Clinic", df$test)
+df$test <- gsub("CDC", "Clinic", df$test)
+
+
+```
+
+Extract all the GPS coordinates using Google Maps as a first stab: We need to get a mapping of the facility code to GPS coordinates for this to be truly useful and accurate...
+```{r}
+
+geocode_lat_lon = data.frame(lon = numeric(0), lat = numeric(0))
+latlong <- sapply(1:657, function(x) {
+  adr <- adr <- as.character(df$test[x]) 
+  print(adr)
+  latlong <-geocode(adr)
+  print(latlong)
+  return(c(adr,latlong))
+}
+)
+```
+
+```{r}
+latlong2 <- t(as.data.frame(latlong))
+df <- cbind(df,latlong2)
+```
+
+
+```{r}
+library("leaflet")
+
+getColor <- function(df) {
+  sapply(df$Language, function(lan) {
+  if(lan == 'eng_ZA') {
+    "green"
+  } else if(lan == 'afr_ZA') {
+    "blue"
+  } else {
+    "red"
+  } })
+}
+
+icons <- awesomeIcons(
+  icon = 'ios-close',
+  iconColor = 'black',
+  library = 'ion',
+  markerColor = getColor(df)
+)
+
+leaflet(df) %>% addTiles() %>%
+  addAwesomeMarkers(~lon, ~lat, icon=icons, label=~as.character(MSISDN),
+                    clusterOptions = markerClusterOptions())
+
+# Show first 20 rows from the `quakes` dataset
+#leaflet(data = df) %>% addTiles() %>% addMarkers(~lon, ~lat, popup = ~as.character(df$MSISDN))
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
